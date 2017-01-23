@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <script src="http://d3js.org/d3.v3.min.js"></script>
+        <script src="http://dimplejs.org/dist/dimple.v2.0.0.min.js"></script>
+        <style>
+            body {
+                width: 1000px;
+            }
+
+            h2 {
+                font-family: sans-serif;
+                color: black;
+                text-align: center;
+            }
+
+            .axis {
+                font-family: sans-serif;
+                font-size: 0.75em;
+            }
+
+            path {
+                fill: none;
+                stroke: gray;
+                stroke-width: 1px;
+            }
+
+            path.data_line {
+                stroke: lightBlue;
+                stroke-width: 2px;
+            }
+
+            .tick {
+                fill: none;
+                stroke: black;
+            }
+
+            circle {
+                opacity: 0.9;
+                stroke: none;
+            }
+
+            .line_plot {
+                fill: none;
+                stroke: #4eb0bb;
+                stroke-width: 1px;
+            }
+
+            .label {
+                font-family: sans-serif;
+                font-size: 0.75em;
+            }
+
+            div.grade_buttons {
+                font-family: sans-serif;
+                position: fixed;
+                top: 100px;
+                left: 1000px;
+                text-align: center;
+            }
+
+            div.grade_buttons div {
+                font-family: sans-serif;
+                border:1px solid #CCC;
+                border-radius: 4px;           
+                box-shadow: 0 0 5px -1px rgba(0,0,0,0.2);
+                cursor:pointer;
+                vertical-align:middle;
+                text-align: center;
+                background-color: rgb(251, 201, 127);
+                padding: 3px;
+                margin: 7px;
+            }
+
+            div.tooltip {   
+                font-family: sans-serif;
+                position: absolute;           
+                text-align: center;           
+                width: 60px;                  
+                height: 28px;                 
+                padding: 2px;             
+                font: 12px sans-serif;        
+                background: lightsteelblue;   
+                border: 0px;      
+                border-radius: 4px;           
+                pointer-events: none;         
+            }
+            </style>
+
+        <script type="text/javascript">
+            function draw(data) {
+                // define margins
+                "use strict";
+                var margin = {top: 40, right: 60, bottom: 20, left: 80};
+                var width = 1000 - margin.left - margin.right,
+                    height = 600 - margin.top - margin.bottom;
+
+                // title
+                d3.select("body")
+                    .append("h2")
+                    .text("Prosper Loans: A History through Credit Scores");
+                
+                // setup margins
+                var svg = d3.select("body")
+                    .append("svg")
+                    .attr("width", width + margin.left + margin.right)
+                    .attr("height", height + margin.top + margin.bottom)
+                    .append('g')
+                    .attr('class', 'chart')
+                    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+                // axis labels
+                svg.append("text")
+                    .attr("class", "x label")
+                    .attr("text-anchor", "end")
+                    .attr("x", width)
+                    .attr("y", height - 6)
+                    .text("loan origination date, grouped by month");
+
+                svg.append("text")
+                    .attr("class", "y label")
+                    .attr("text-anchor", "end")
+                    .attr("y", 6)
+                    .attr("dy", ".75em")
+                    .attr("transform", "rotate(-90)")
+                    .text("average credit score");
+
+                // prosper ratings risk labels
+                svg.append("text")
+                    .attr("class", "risk label")
+                    .attr("text-anchor", "end")
+                    .attr("x", -125)
+                    .attr("y", width + margin.right - 20)
+                    .attr("dy", ".75em")
+                    .attr("transform", "rotate(-90)")
+                    .text("highest to lowest risk");
+                        
+                // setup tooltip div
+                var div = d3.select("body").append("div")   
+                    .attr("class", "tooltip")               
+                    .style("opacity", 0);
+
+                /*
+                D3.js Chart construction code
+                */
+                
+                // filter out empty prosper rating
+                var data = data.filter(function(d) {
+                    var result = d['ProsperRating'] != '';
+                    return result;
+                });
+
+                // scaling
+                var time_extent = d3.extent(data, function(d) {
+                    return d['LoanOriginationDate'];
+                });
+
+                var time_scale = d3.time.scale()
+                    .range([0, width])
+                    .domain(time_extent);
+
+                var count_extent = d3.extent(data, function(d) {
+                    return d['CreditScore'];
+                });
+
+                var count_scale = d3.scale.linear()
+                    .range([height, 0])
+                    .domain(count_extent);
+
+                var time_axis = d3.svg.axis()
+                    .scale(time_scale)
+                    .ticks(d3.time.years, 1);
+
+                // setup axis
+                 svg.append('g')
+                    .attr('class', 'x axis')
+                    .attr('transform', "translate(0," + height + ")")
+                    .call(time_axis);
+
+                var count_axis = d3.svg.axis()
+                                        .scale(count_scale)
+                                        .orient("left");
+
+                var line = d3.svg.line()
+                    .x( function(d) {
+                        return time_scale(d.values['LoanOriginationDate']);
+                    })
+                    .y( function(d) {
+                        return count_scale(d.values['CreditScore']);
+                    });
+ 
+                svg.append('g')
+                    .attr('class', 'y axis')
+                    .call(count_axis);
+                    
+                // setup the path for the line chart
+                svg.append("path")
+                    .attr("class", "data_line");
+                    
+                // month formatting
+                var formatDate = d3.time.format("%b %Y");
+                
+                // tooltip formatting
+                function styleToolTip(d) {
+                    var text = getToolTipText(d);
+                    var width = 60 * (text.indexOf("<hr/>") >= 0 ? 4 : 1);
+                    var height = 14 * ( text.split("<").length + (text.indexOf("<hr/>") >= 0 ? 1 : 0) );
+                    div .html(text)  
+                        .style("left", d.values["LoanOriginationDate"].getUTCFullYear() <= 2010 ? (d3.event.pageX + 10) + "px" : (d3.event.pageX - width - 10) + "px" )     
+                        .style("top", d.values['CreditScore'] < 100 || width < 100 ? (d3.event.pageY - height - 10) + "px" : (d3.event.pageY + 10) + "px")
+                        .style("width", width + "px")
+                        .style("height", height + "px");    
+                }
+                
+                function getToolTipText(d) {
+                    var month = formatDate(d.values['LoanOriginationDate']);
+                    var ttText = month + "<br/>Score: "  + d.values["CreditScore"];
+                    // below are the relevant data events
+                    if( month == "Nov 2005" ) {
+                        ttText += "<hr/>Prosper was founded by Chris Larsen <br/>and John Witchel.";
+                    }
+                    else if( month == "Feb 2006" ) {
+                        ttText += "<hr/>Prosper opened to the public.";
+                    }
+                    else if( month == "Oct 2008" ) {
+                        ttText += "<hr/>In November, SEC found Prosper to be in <br/>violation of the Securities Act of 1933.<br/>Class-action lawsuit filed against Prosper.<br/>Beginning of the \"quiet period\" when <br/>no loans were originated.";
+                    }
+                    else if( month == "Jul 2009" ) {
+                        ttText += "<hr/>In July 2009, Prosper reopened their <br/>website for lending and borrowing <br/>after having obtained SEC registration <br/>for its loans.<br/>SEC required a minimum credit score <br/>of 640 for any loan.";
+                    }
+                    else if( month == "Apr 2010" ) {
+                        ttText += "<hr/>Prosper received a Series D funding round <br/>of $14.7M.";
+                    }
+                    else if( month == "Apr 2010" ) {
+                        ttText += "<hr/>Prosper received an additional funding infusion <br/>in a Series E round.";
+                    }
+                    else if( month == "Jan 2013" ) {
+                        ttText += "<hr/>Prosper received $20 million in funding.";
+                    }
+                    else if( month == "Sep 2013" ) {
+                        ttText += "<hr/>Prosper received another $25 million in <br/>funding.";
+                    }
+                    
+                    return ttText;
+                }
+                
+                // circle formatting
+                var circleColor = function cicleColor(d) {
+                    var month = formatDate(d.values['LoanOriginationDate']);
+                    var color = "#3092F9";
+                    // events have a different color
+                    if( month == "Nov 2005" ||  month == "Feb 2006" || month == "Oct 2008" || month == "Jul 2009" || month == "Apr 2010" || month == "Apr 2010" || month == "Jan 2013" || month == "Sep 2013" ) {
+                        color = "#7C0C52";
+                    }
+                    
+                    return color;
+                }
+
+                var cicleRadius = function cicleRadius(d) {
+                    var month = formatDate(d.values['LoanOriginationDate']);
+                    var radius = 3;
+                    // events have a different size
+                    if( month == "Nov 2005" ||  month == "Feb 2006" || month == "Oct 2008" || month == "Jul 2009" || month == "Apr 2010" || month == "Apr 2010" || month == "Jan 2013" || month == "Sep 2013" ) {
+                        radius = 4;
+                    }
+                    
+                    return radius;
+                }
+
+                function update(prosperRating) {
+                    var filtered = data.filter(function(d) {
+                        var result = true;
+                        if( prosperRating != "All" ) {
+                            result &= d['ProsperRating'] == prosperRating;
+                        }
+                        return result;
+                    });
+
+                    function agg_year(leaves) {
+                        var creditScore = d3.mean(leaves, function(d) {
+                            return d['CreditScore'];
+                        });
+
+                        return {
+                            'CreditScore' : Math.round( creditScore ),
+                            'LoanOriginationDate': leaves[0]['LoanOriginationDate']
+                        };
+                    }
+                    
+                    var nested = d3.nest()
+                                    .key(function(d) {
+                                        return d['LoanOriginationDate'];
+                                    })
+                                    .rollup(agg_year)
+                                    .entries(filtered);
+                                    
+                    function sortByDateAscending(a, b) {
+                        // Dates will be cast to numbers automagically:
+                        return a.values['LoanOriginationDate'] - b.values['LoanOriginationDate'];
+                    }
+                    // sort nested by date
+                    nested = nested.sort( sortByDateAscending );
+
+                    var circles = svg.selectAll("circle")
+                        .data(nested);
+                    
+                    circles.exit().remove();
+
+                    circles.enter()
+                        .append("circle");
+                        
+                    d3.selectAll("circle")
+                        .on("mouseover", function(d) {
+                            div.transition()        
+                                .duration(200)      
+                                .style("opacity", .9);
+
+                            styleToolTip(d);
+                        })
+                        .on("mouseout", function() {
+                            div.transition()        
+                                .duration(500)      
+                                .style("opacity", 0);   
+                        })
+                        .transition()
+                        .duration(500)
+                        .ease("linear")
+                        .attr('cx', function(d) {
+                            return time_scale(d.values['LoanOriginationDate']);
+                        })
+                        .attr('cy', function(d) {
+                            return count_scale(d.values['CreditScore']);
+                        })
+                        .attr('r', cicleRadius)
+                        .attr('fill', circleColor);
+
+                    d3.selectAll("path.data_line")
+                        .transition()
+                        .duration(500)
+                        .ease("linear")
+                        .attr('d', line(nested));
+                }
+
+                update("All");
+                
+                var prosperRatings = [ "All", "AA", "A", "B", "C", "D", "E", "HR" ];
+                var buttons = d3.select("body")
+                    .append("div")
+                    .attr("class", "grade_buttons")
+                    .html("<b>Prosper<br/>Ratings</b>")
+                    .selectAll("div")
+                    .data(prosperRatings)
+                    .enter()
+                    .append("div")
+                    .attr("class", function(d) { return "button " + d; })
+                    .text(function(d) {
+                        return d;
+                    });
+
+                buttons.on("click", function(d) {
+                    d3.select(".grade_buttons")
+                      .selectAll("div")
+                      .transition()
+                      .duration(500)
+                      .style("color", "black")
+                      .style("background", "rgb(251, 201, 127)");
+
+                    d3.select(this)
+                      .transition()
+                      .duration(500)
+                      .style("background", "lightBlue")
+                      .style("color", "white");
+                      
+                    update(d);
+                });
+
+                // start with "All" formatted as Prosper Rating selection
+                d3.select("div.All")
+                    .style("background", "lightBlue")
+                    .style("color", "white");
+
+            };
+        </script>
+    </head>
+    <body>
+        <script type="text/javascript">
+            /*
+            Use D3 (not dimple.js) to load the TSV file
+            and pass the contents of it to the draw function
+            */
+            format = d3.time.format("%Y-%m-%d %H:%M:%S");
+
+            d3.tsv("data/prosperLoanData.csv", function(d) {
+                var originationDate = format.parse(d['LoanOriginationDate']);
+                originationDate.setDate(1);
+                return {
+                    // average upper and lower range to get credit score
+                    CreditScore: ( (+d["CreditScoreRangeLower"]) + (+d["CreditScoreRangeUpper"]) ) / 2,
+                    LoanOriginationDate: originationDate,
+                    ProsperRating: d['CreditGrade'] + d["ProsperRating (Alpha)"],
+                    LoanStatus: d['LoanStatus']
+                };
+            }, draw);
+        </script>
+    </body>
+</html>
