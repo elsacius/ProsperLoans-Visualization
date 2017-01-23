@@ -147,7 +147,9 @@
                 
                 // filter out empty prosper rating
                 var data = data.filter(function(d) {
-                    var result = d['ProsperRating'] != '';
+                    var result = true;
+                    result &= d['ProsperRating'] != '';
+                    result &= ! isNaN(d['CreditScore']);
                     return result;
                 });
 
@@ -391,15 +393,14 @@
             */
             format = d3.time.format("%Y-%m-%d %H:%M:%S");
 
-            d3.tsv("data/prosperLoanData.csv", function(d) {
+            d3.csv("prosperLoanData.csv", function(d) {
                 var originationDate = format.parse(d['LoanOriginationDate']);
                 originationDate.setDate(1);
                 return {
                     // average upper and lower range to get credit score
                     CreditScore: ( (+d["CreditScoreRangeLower"]) + (+d["CreditScoreRangeUpper"]) ) / 2,
                     LoanOriginationDate: originationDate,
-                    ProsperRating: d['CreditGrade'] + d["ProsperRating (Alpha)"],
-                    LoanStatus: d['LoanStatus']
+                    ProsperRating: d['CreditGrade'] + d["ProsperRating (Alpha)"]
                 };
             }, draw);
         </script>
